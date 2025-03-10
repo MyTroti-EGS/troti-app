@@ -1,5 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useBearStore } from 'store/store';
+import { Button } from './Button';
+
 export default function EditScreenInfo({ path }: { path: string }) {
   const title = 'Open up the code for this screen:';
   const description =
@@ -12,6 +15,15 @@ export default function EditScreenInfo({ path }: { path: string }) {
         <Text>{path}</Text>
       </View>
       <Text style={styles.getStartedText}>{description}</Text>
+      <Text style={styles.getStartedText}>
+        This is the number of bears: {useBearStore((state) => state.bears)}
+      </Text>
+      <Button
+        title="Increase Population"
+        onPress={() => useBearStore.getState().increasePopulation()}
+      />
+      <Button title="Remove All Bears" onPress={() => useBearStore.getState().removeAllBears()} />
+      <Button title="Update Bears" onPress={() => useBearStore.getState().updateBears(12)} />
     </View>
   );
 }
