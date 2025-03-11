@@ -33,7 +33,7 @@ export default function Map() {
 
 function ScooterLayer() {
   const scootersFeatures = featureCollection(
-    scooters.map((scooter) => point([scooter.long, scooter.lat]))
+    scooters.map((scooter) => point([scooter.long, scooter.lat], { state: scooter.state }))
   );
 
   return (
@@ -41,16 +41,14 @@ function ScooterLayer() {
       <SymbolLayer
         id="scooter-layer"
         style={{
-          iconImage: 'available',
-          iconSize: 0.15,
+          iconImage: ['get', 'state'],
+          iconSize: 0.23,
           iconAllowOverlap: true,
           iconAnchor: 'center',
         }}
       />
 
-      <Images images={{ available }} />
-      <Images images={{ charging }} />
-      <Images images={{ disabled }} />
+      <Images images={{ available, charging, disabled }} />
     </ShapeSource>
   );
 }
