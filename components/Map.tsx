@@ -1,4 +1,18 @@
-import MapBox, { Camera, LocationPuck, MapView } from '@rnmapbox/maps';
+import MapBox, {
+  Camera,
+  Images,
+  LocationPuck,
+  MapView,
+  ShapeSource,
+  SymbolLayer,
+} from '@rnmapbox/maps';
+import { featureCollection, point } from '@turf/helpers';
+
+import scooters from 'data/scooters.json';
+
+import available from 'assets/available.png';
+import charging from 'assets/charging.png';
+import disabled from 'assets/disabled.png';
 
 MapBox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_KEY || '');
 
@@ -11,6 +25,32 @@ export default function Map() {
     <MapView style={styles} logoEnabled={false} attributionEnabled={false} scaleBarEnabled={false}>
       <Camera followZoomLevel={14} followUserLocation />
       <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
+
+      <ScooterLayer />
     </MapView>
+  );
+}
+
+function ScooterLayer() {
+  const scootersFeatures = featureCollection(
+    scooters.map((scooter) => point([scooter.long, scooter.lat]))
+  );
+
+  return (
+    <ShapeSource id="scooter-source" shape={scootersFeatures}>
+      <SymbolLayer
+        id="scooter-layer"
+        style={{
+          iconImage: 'available',
+          iconSize: 0.15,
+          iconAllowOverlap: true,
+          iconAnchor: 'center',
+        }}
+      />
+
+      <Images images={{ available }} />
+      <Images images={{ charging }} />
+      <Images images={{ disabled }} />
+    </ShapeSource>
   );
 }
