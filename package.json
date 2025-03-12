@@ -1,5 +1,5 @@
 {
-  "name": "Troti-App",
+  "name": "troti-app",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
