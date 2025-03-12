@@ -28,6 +28,7 @@
       "bundleIdentifier": "pt.miguelovila.troti"
     },
     "android": {
+      "windowTranslucentStatus": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
