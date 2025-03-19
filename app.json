@@ -3,12 +3,12 @@
     "name": "Troti",
     "slug": "Troti",
     "version": "1.0.0",
-    "scheme": "Troti",
+    "scheme": "troti",
     "newArchEnabled": true,
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icons.png"
     },
     "experiments": {
       "typedRoutes": true,
@@ -30,10 +30,11 @@
     "android": {
       "windowTranslucentStatus": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "pt.miguelovila.troti"
+      "package": "pt.miguelovila.troti",
+      "permissions": ["ACCESS_FINE_LOCATION"]
     },
     "plugins": [
       "expo-router",
@@ -47,7 +48,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Show current user location on map and locate nearby scooters"
+          "locationWhenInUsePermission": "Show current user location on map to locate nearby scooters"
         }
       ]
     ]
