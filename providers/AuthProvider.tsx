@@ -38,8 +38,14 @@ function decodeToken(token: string): { name: string; email: string; exp: number 
 }
 
 function isTokenExpired(token: string): boolean {
-  const { exp } = decodeToken(token);
-  return Date.now() >= exp * 1000;
+  try {
+    const { exp } = decodeToken(token);
+    console.log('Token expiration:', exp);
+    return Date.now() >= exp * 1000;
+  } catch (error) {
+    console.log('Error decoding token:', error);
+    return true; // Treat invalid tokens as expired
+  }
 }
 
 export default function AuthProvider({ children }: { children: ReactNode }): ReactNode {
@@ -51,23 +57,30 @@ export default function AuthProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     (async (): Promise<void> => {
       const token = await AsyncStorage.getItem('@token');
+      console.log('Token:', token);
+
       if (token) {
-        if (isTokenExpired(token)) {
-          await AsyncStorage.setItem('@token', '');
-          tokenRef.current = null;
-          nameRef.current = null;
-          emailRef.current = null;
-          router.replace('/login');
-        } else {
+        try {
+          console.log('Is token expired:', isTokenExpired(token));
+
+          if (isTokenExpired(token)) {
+            signOut();
+            return;
+          }
+
           tokenRef.current = token;
           const { name, email } = decodeToken(token);
           nameRef.current = name;
           emailRef.current = email;
           router.replace('/');
+        } catch (error) {
+          console.log('Error processing token:', error);
+          signOut();
         }
       } else {
-        router.replace('/login');
+        signOut();
       }
+
       setIsLoading(false);
     })();
   }, []);

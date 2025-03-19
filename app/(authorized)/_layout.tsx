@@ -7,7 +7,7 @@ export default function RootLayout(): ReactNode {
   const { token, isLoading } = useAuthSession();
 
   if (isLoading) {
-    return <Text>Loading...</Text>;
+    return <></>;
   }
 
   if (token?.current === '') {
