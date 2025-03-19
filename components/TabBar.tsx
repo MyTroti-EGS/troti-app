@@ -3,10 +3,8 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import TabBarButton from './TabBarButton';
 import { useState } from 'react';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { useTheme } from '@react-navigation/native';
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { colors } = useTheme();
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const tabPositionX = useSharedValue(0);
 
@@ -32,7 +30,7 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
           {
             width: buttonWidth - 25,
             height: dimensions.height - 15,
-            backgroundColor: colors.primary,
+            backgroundColor: '#175D97',
           },
         ]}
       />
