@@ -10,6 +10,7 @@ import MapBox, {
   SymbolLayer,
 } from '@rnmapbox/maps';
 import { featureCollection, point } from '@turf/helpers';
+import ChargingStationsLayer from 'components/ChargingStationLayer';
 
 import scooters from 'data/scooters.json';
 
@@ -43,8 +44,9 @@ export default function Map() {
         attributionEnabled={false}
         scaleBarEnabled={false}>
         <Camera followZoomLevel={14} followUserLocation />
-        <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
         <ScooterLayer />
+        <ChargingStationsLayer />
+        <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
       </MapView>
     </View>
   );
