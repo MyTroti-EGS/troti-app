@@ -1,25 +1,8 @@
-import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapBox, {
-  Camera,
-  Images,
-  LocationPuck,
-  MapView,
-  ShapeSource,
-  SymbolLayer,
-} from '@rnmapbox/maps';
-import { featureCollection, point } from '@turf/helpers';
+import MapBox, { Camera, LocationPuck, MapView } from '@rnmapbox/maps';
+import ScooterLayer from 'components/ScootersLayer';
 import ChargingStationsLayer from 'components/ChargingStationLayer';
-
-import scooters from 'data/scooters.json';
-
-//@ts-expect-error
-import available from 'assets/available.png';
-//@ts-expect-error
-import charging from 'assets/charging.png';
-//@ts-expect-error
-import disabled from 'assets/disabled.png';
 
 MapBox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_KEY || '');
 
@@ -49,28 +32,6 @@ export default function Map() {
         <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
       </MapView>
     </View>
-  );
-}
-
-function ScooterLayer() {
-  const scootersFeatures = featureCollection(
-    scooters.map((scooter) => point([scooter.long, scooter.lat], { state: scooter.state }))
-  );
-
-  return (
-    <ShapeSource id="scooter-source" shape={scootersFeatures}>
-      <SymbolLayer
-        id="scooter-layer"
-        style={{
-          iconImage: ['get', 'state'],
-          iconSize: 0.23,
-          iconAllowOverlap: true,
-          iconAnchor: 'center',
-        }}
-      />
-
-      <Images images={{ available, charging, disabled }} />
-    </ShapeSource>
   );
 }
 

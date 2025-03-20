@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShapeSource, SymbolLayer, Images } from '@rnmapbox/maps';
 import { featureCollection, point } from '@turf/helpers';
 
@@ -93,13 +93,13 @@ export default function ChargingStationsLayer() {
           iconSize: 0.23,
           iconAllowOverlap: true,
           iconAnchor: 'center',
-          //textField: ['get', 'name'],
-          //textSize: 12,
-          //textOffset: [0, -2],
-          //textAnchor: 'top',
-          //textColor: '#175D97',
-          //textHaloColor: 'white',
-          //textHaloWidth: 1,
+          textField: ['get', 'name'],
+          textSize: 12,
+          textOffset: [0, -2],
+          textAnchor: 'top',
+          textColor: '#175D97',
+          textHaloColor: 'white',
+          textHaloWidth: 1,
         }}
       />
 
