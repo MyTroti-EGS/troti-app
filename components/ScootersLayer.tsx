@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ShapeSource, SymbolLayer, Images } from '@rnmapbox/maps';
-import { featureCollection, point } from '@turf/helpers';
+import { ShapeSource, SymbolLayer, Images, Camera } from '@rnmapbox/maps';
+import { featureCollection, point, Feature, Point, Properties } from '@turf/helpers';
+import { useQuery, useSubscription } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { Scooter, ScooterUpdate } from 'types/graphql';
+import RideDrawer from './RideDrawer';
 
 // Import scooter icons
 //@ts-expect-error
@@ -12,58 +16,60 @@ import disabled from 'assets/disabled.png';
 //@ts-expect-error
 import occupied from 'assets/occupied.png';
 
-function ScooterLayer() {
-  const [scooters, setScooters] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchScooters = async () => {
-      try {
-        const response = await fetch('https://bckegs.mxv.pt/graphql/v1', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: `
-              query Scooters {
-                scooters {
-                  id
-                  battery
-                  mac_address
-                  serial_number
-                  status
-                  location {
-                    latitude
-                    longitude
-                  }
-                }
-              }
-            `,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (result.errors) {
-          throw new Error(result.errors[0].message);
-        }
-
-        setScooters(result.data.scooters);
-      } catch (err) {
-        console.error('Error fetching scooters:', err);
-        setError(err);
-      } finally {
-        setLoading(false);
+const GET_SCOOTERS = gql`
+  query GetScooters {
+    scooters {
+      id
+      battery
+      mac_address
+      serial_number
+      status
+      location {
+        latitude
+        longitude
       }
-    };
+    }
+  }
+`;
 
-    fetchScooters();
-  }, []);
+const SCOOTER_UPDATED = gql`
+  subscription OnScooterUpdated {
+    scooterUpdated {
+      id
+      battery
+      mac_address
+      serial_number
+      status
+      location {
+        latitude
+        longitude
+      }
+    }
+  }
+`;
+
+type ScooterProperties = {
+  id: string;
+  status: string;
+  battery: number;
+  iconName: string;
+  serial: string;
+};
+
+interface ScooterLayerProps {
+  onScooterSelect?: (scooter: Scooter) => void;
+}
+
+function ScooterLayer({ onScooterSelect }: ScooterLayerProps) {
+  const { loading, error, data } = useQuery(GET_SCOOTERS);
+  const { data: subscriptionData } = useSubscription(SCOOTER_UPDATED);
+  const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isRiding, setIsRiding] = useState(false);
 
   // If still loading or there's an error, don't render the layer yet
-  if (loading || error) {
+  if (loading || error || !data?.scooters) {
     return null;
   }
 
@@ -83,41 +89,95 @@ function ScooterLayer() {
     }
   };
 
+  const handleScooterPress = (scooter: Scooter) => {
+    if (isRiding) return; // Prevent selecting other scooters during a ride
+    
+    setSelectedScooter(scooter);
+    setIsDrawerVisible(true);
+    setIsMinimized(false);
+    
+    // Call the onScooterSelect callback if provided
+    if (onScooterSelect) {
+      onScooterSelect(scooter);
+    }
+  };
+
+  const handleStartRide = () => {
+    setIsRiding(true);
+    // TODO: Implement start ride logic
+    console.log('Starting ride with scooter:', selectedScooter?.id);
+  };
+
+  const handleStopRide = () => {
+    setIsRiding(false);
+    // TODO: Implement stop ride logic
+    console.log('Stopping ride with scooter:', selectedScooter?.id);
+  };
+
   // Create GeoJSON feature collection for the scooters
   const scootersFeatures = featureCollection(
-    scooters.map((scooter) =>
-      point([parseFloat(scooter.location.longitude), parseFloat(scooter.location.latitude)], {
+    data.scooters.map((scooter: Scooter) =>
+      point([parseFloat(scooter.location.longitude.toString()), parseFloat(scooter.location.latitude.toString())], {
         id: scooter.id,
         status: scooter.status,
         battery: scooter.battery,
         iconName: getIconName(scooter.status),
         serial: scooter.serial_number,
-      })
+      } as ScooterProperties)
     )
   );
 
   return (
-    <ShapeSource id="scooter-source" shape={scootersFeatures}>
-      <SymbolLayer
-        id="scooter-layer"
-        style={{
-          iconImage: ['get', 'iconName'],
-          iconSize: 0.23,
-          iconAllowOverlap: true,
-          iconAnchor: 'center',
-          // Optional: Add battery percentage as text
-          textField: ['concat', ['get', 'battery'], '%'],
-          textSize: 10,
-          textOffset: [0, 2],
-          textAnchor: 'top',
-          textColor: '#333',
-          textHaloColor: 'white',
-          textHaloWidth: 1,
-        }}
-      />
-
+    <>
       <Images images={{ available, charging, disabled, occupied }} />
-    </ShapeSource>
+      <ShapeSource 
+        id="scooter-source" 
+        shape={scootersFeatures as any}
+        onPress={(event: any) => {
+          const feature = event.features[0];
+          if (feature) {
+            const scooter = data.scooters.find((s: Scooter) => s.id === feature.properties?.id);
+            if (scooter) {
+              handleScooterPress(scooter);
+            }
+          }
+        }}
+      >
+        <SymbolLayer
+          id="scooter-layer"
+          style={{
+            iconImage: ['get', 'iconName'],
+            iconSize: 0.23,
+            iconAllowOverlap: true,
+            iconAnchor: 'center',
+            textField: ['concat', ['get', 'battery'], '%'],
+            textSize: 10,
+            textOffset: [0, 2],
+            textAnchor: 'top',
+            textColor: '#333',
+            textHaloColor: 'white',
+            textHaloWidth: 1,
+          }}
+        />
+      </ShapeSource>
+
+      <RideDrawer
+        isVisible={isDrawerVisible}
+        onClose={() => {
+          setIsDrawerVisible(false);
+          setIsMinimized(false);
+          if (!isRiding) {
+            setSelectedScooter(null);
+          }
+        }}
+        scooter={selectedScooter}
+        onStartRide={handleStartRide}
+        onStopRide={handleStopRide}
+        isMinimized={isMinimized}
+        onMinimize={() => setIsMinimized(true)}
+        onExpand={() => setIsMinimized(false)}
+      />
+    </>
   );
 }
 
