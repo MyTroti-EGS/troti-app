@@ -33,7 +33,7 @@ export default function Login(): ReactNode {
   };
 
   const login = (): void => {
-    Linking.openURL('https://bckegs.mxv.pt/login');
+    Linking.openURL('https://egs-backend.mxv.pt/login');
   };
 
   return (
