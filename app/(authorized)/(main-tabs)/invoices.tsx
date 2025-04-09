@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Modal, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Modal, RefreshControl, Animated } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import { useAuthSession } from 'providers/AuthProvider';
 import { format } from 'date-fns';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const USER_INFO_QUERY = gql`
   query UserInfo {
@@ -31,18 +32,45 @@ const SORT_OPTIONS = [
   { label: 'Unpaid First', value: 'unpaidFirst' as SortOption },
 ];
 
+interface Invoice {
+  id: string;
+  amount: string;
+  paid: string;
+  paidAt: string | null;
+  currency: string;
+  paymentId: string | null;
+  createdAt: string;
+}
+
 export default function InvoicesScreen() {
   const { token } = useAuthSession();
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = new Animated.Value(0);
   const { loading, error, data, refetch } = useQuery(USER_INFO_QUERY, {
     context: {
       headers: {
         Authorization: `Bearer ${token?.current}`,
       },
     },
+    fetchPolicy: 'network-only',
   });
+
+  useEffect(() => {
+    console.log('Token:', token?.current);
+    console.log('Loading:', loading);
+    console.log('Error:', error);
+    console.log('Data:', data);
+  }, [token, loading, error, data]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const handlePayNow = (invoiceId: string) => {
     const paymentUrl = `https://egs-backend.mxv.pt/pay/${invoiceId}`;
@@ -52,7 +80,7 @@ export default function InvoicesScreen() {
   const sortedInvoices = useMemo(() => {
     if (!data?.userInfo?.invoices) return [];
     
-    const invoices = [...data.userInfo.invoices];
+    const invoices = [...data.userInfo.invoices].filter(Boolean);
     
     switch (sortBy) {
       case 'newest':
@@ -95,25 +123,75 @@ export default function InvoicesScreen() {
     }
   };
 
+  const totalPaid = useMemo(() => {
+    return data?.userInfo?.invoices
+      ?.filter((invoice: Invoice) => invoice.paid === "true")
+      .reduce((sum: number, invoice: Invoice) => sum + parseFloat(invoice.amount), 0) || 0;
+  }, [data?.userInfo?.invoices]);
+
+  const totalUnpaid = useMemo(() => {
+    return data?.userInfo?.invoices
+      ?.filter((invoice: Invoice) => invoice.paid !== "true")
+      .reduce((sum: number, invoice: Invoice) => sum + parseFloat(invoice.amount), 0) || 0;
+  }, [data?.userInfo?.invoices]);
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={[styles.container, { paddingTop: 40 }]}>
+        <View style={styles.skeletonHeader} />
+        <View style={styles.skeletonCard} />
+        <View style={styles.skeletonCard} />
+        <View style={styles.skeletonCard} />
       </View>
     );
   }
 
   if (error) {
+    console.error('GraphQL Error:', error);
     return (
-      <View style={styles.container}>
-        <Text>Error loading invoices</Text>
+      <View style={[styles.container, { paddingTop: 40 }]}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#FF3B30" />
+          <Text style={styles.errorTitle}>Error Loading Invoices</Text>
+          <Text style={styles.errorMessage}>{error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!data?.userInfo?.invoices) {
+    return (
+      <View style={[styles.container, { paddingTop: 40 }]}>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="document-text" size={48} color="#ccc" />
+          <Text style={styles.emptyText}>No invoices found</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>My Invoices</Text>
+      <LinearGradient
+        colors={['#175D97', '#1A6BA8']}
+        style={styles.header}
+      >
+        <Text style={styles.title}>My Invoices</Text>
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Total Paid</Text>
+            <Text style={styles.summaryValue}>{totalPaid.toFixed(2)} €</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Total Unpaid</Text>
+            <Text style={[styles.summaryValue, styles.unpaidValue]}>{totalUnpaid.toFixed(2)} €</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Sort by:</Text>
         <TouchableOpacity 
@@ -137,6 +215,12 @@ export default function InvoicesScreen() {
           onPress={() => setIsSortModalVisible(false)}
         >
           <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sort Invoices</Text>
+              <TouchableOpacity onPress={() => setIsSortModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
             {SORT_OPTIONS.map((option) => (
               <TouchableOpacity
                 key={option.value}
@@ -168,19 +252,33 @@ export default function InvoicesScreen() {
         data={sortedInvoices}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.invoiceItem}>
+          <View style={styles.invoiceCard}>
             <View style={styles.invoiceHeader}>
-              <Text style={styles.invoiceDate}>
-                {format(new Date(item.createdAt), 'MMM dd, yyyy HH:mm')}
-              </Text>
-              <Text style={[styles.status, item.paid === "true" ? styles.paid : styles.unpaid]}>
-                {item.paid === "true" ? 'Paid' : 'Unpaid'}
-              </Text>
+              <View style={styles.invoiceDateContainer}>
+                <Ionicons name="calendar" size={16} color="#666" />
+                <Text style={styles.invoiceDate}>
+                  {format(new Date(item.createdAt), 'MMM dd, yyyy HH:mm')}
+                </Text>
+              </View>
+              <View style={[
+                styles.statusBadge,
+                item.paid === "true" ? styles.paidBadge : styles.unpaidBadge
+              ]}>
+                <Text style={[
+                  styles.status,
+                  item.paid === "true" ? styles.paid : styles.unpaid
+                ]}>
+                  {item.paid === "true" ? 'Paid' : 'Unpaid'}
+                </Text>
+              </View>
             </View>
             <View style={styles.invoiceDetails}>
-              <Text style={styles.amount}>
-                {item.amount} {item.currency}
-              </Text>
+              <View style={styles.amountContainer}>
+                <Text style={styles.amountLabel}>Amount</Text>
+                <Text style={styles.amount}>
+                  {parseFloat(item.amount).toFixed(2)} {item.currency}
+                </Text>
+              </View>
               {item.paid !== "true" && (
                 <TouchableOpacity
                   style={styles.payButton}
@@ -193,6 +291,12 @@ export default function InvoicesScreen() {
           </View>
         )}
         contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="document-text" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>No invoices found</Text>
+          </View>
+        )}
         ListFooterComponent={() => (
           <View style={styles.footer}>
             <Text style={styles.footerText}>End of Results</Text>
@@ -214,19 +318,52 @@ export default function InvoicesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    paddingTop: 55,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginTop: 40,
-    padding: 20,
-    textAlign: 'center',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  summaryItem: {
+    flex: 1,
+    marginHorizontal: 5,
+    padding: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 5,
+  },
+  unpaidValue: {
+    color: '#FF3B30',
   },
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginTop: 20,
     marginBottom: 10,
   },
   sortLabel: {
@@ -239,11 +376,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f8f8',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sortButtonText: {
     fontSize: 16,
@@ -256,23 +398,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 10,
+    backgroundColor: '#fff',
+    borderRadius: 20,
     padding: 20,
     width: '80%',
-    maxWidth: 300,
+    maxWidth: 400,
   },
-  sortOption: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
   },
   selectedSortOption: {
-    backgroundColor: '#f0f7ff',
+    backgroundColor: '#f8f8f8',
   },
   sortOptionText: {
     fontSize: 16,
@@ -280,54 +432,68 @@ const styles = StyleSheet.create({
   },
   selectedSortOptionText: {
     color: '#175D97',
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
-  listContainer: {
-    padding: 20,
-  },
-  invoiceItem: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    padding: 15,
+  invoiceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginHorizontal: 20,
     marginBottom: 15,
+    padding: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   invoiceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
+  },
+  invoiceDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   invoiceDate: {
     fontSize: 14,
     color: '#666',
+    marginLeft: 5,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  paidBadge: {
+    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+  },
+  unpaidBadge: {
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
   },
   status: {
     fontSize: 14,
-    fontWeight: '500',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    fontWeight: '600',
   },
   paid: {
-    backgroundColor: '#e6f7e6',
-    color: '#2e7d32',
+    color: '#27AE60',
   },
   unpaid: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
+    color: '#FF3B30',
   },
   invoiceDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  amountContainer: {
+    flex: 1,
+  },
+  amountLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
   },
   amount: {
     fontSize: 18,
@@ -337,20 +503,75 @@ const styles = StyleSheet.create({
   payButton: {
     backgroundColor: '#175D97',
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   payButtonText: {
     color: '#fff',
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  listContainer: {
+    paddingVertical: 15,
   },
   footer: {
-    marginTop: 10,
-    marginBottom: 95,
+    marginBottom:80,
+    padding: 20,
     alignItems: 'center',
   },
   footerText: {
     color: '#666',
     fontSize: 14,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    marginTop: 10,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 5,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#175D97',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  skeletonHeader: {
+    height: 40,
+    backgroundColor: '#f0f0f0',
+    margin: 20,
+    borderRadius: 8,
+  },
+  skeletonCard: {
+    height: 100,
+    backgroundColor: '#f0f0f0',
+    margin: 20,
+    marginTop: 10,
+    borderRadius: 12,
   },
 });
