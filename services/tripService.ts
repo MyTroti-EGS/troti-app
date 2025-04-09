@@ -15,6 +15,15 @@ interface TripEndResponse {
   paymentId: string;
 }
 
+interface TripStatusResponse {
+  state: 'TRIP' | 'NO_TRIP';
+  trip: {
+    id: string;
+    startDate: string;
+    scooterId: string;
+  } | null;
+}
+
 export const startTrip = async (scooterId: string, token: string): Promise<TripStartResponse> => {
   if (!token) {
     throw new Error('No authentication token found');
@@ -64,6 +73,31 @@ export const endTrip = async (token: string): Promise<TripEndResponse> => {
     return response.json();
   } catch (error) {
     console.error('End trip error:', error);
+    throw error;
+  }
+};
+
+export const getTripStatus = async (token: string): Promise<TripStatusResponse> => {
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  try {
+    const response = await fetch('https://egs-backend.mxv.pt/v1/trip', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.message || `Failed to get trip status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Get trip status error:', error);
     throw error;
   }
 }; 
