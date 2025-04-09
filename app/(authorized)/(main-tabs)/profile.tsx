@@ -3,6 +3,7 @@ import { useAuthSession } from 'providers/AuthProvider';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import CryptoJS from 'react-native-crypto-js';
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -31,6 +32,12 @@ export default function ProfileScreen() {
   const { name, email, signOut } = useAuthSession();
   const insets = useSafeAreaInsets();
 
+  const getGravatarUrl = (email: string) => {
+    const trimmedEmail = email.toLowerCase().trim();
+    const hash = CryptoJS.MD5(trimmedEmail).toString();
+    return `https://www.gravatar.com/avatar/${hash}?s=200&d=mm`;
+  };
+
   const handleSignOut = () => {
     signOut();
   };
@@ -48,7 +55,7 @@ export default function ProfileScreen() {
           {email?.current && (
             <Image
               source={{
-                uri: `https://www.gravatar.com/avatar/${email.current.toLowerCase().trim()}?s=200&d=mm`,
+                uri: getGravatarUrl(email.current),
               }}
               style={styles.avatar}
             />
