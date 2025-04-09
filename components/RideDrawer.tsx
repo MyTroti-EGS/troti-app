@@ -151,6 +151,12 @@ export default function RideDrawer({
         params: {
           tripCost: response.tripCost.toString(),
           invoiceId: response.invoiceId,
+          duration: timer.toString(),
+          distance: '0 km', // You can add actual distance calculation here
+          startLat: currentScooter?.location?.latitude.toString(),
+          startLng: currentScooter?.location?.longitude.toString(),
+          endLat: currentScooter?.location?.latitude.toString(), // You can update this with actual end location
+          endLng: currentScooter?.location?.longitude.toString(), // You can update this with actual end location
         },
       });
     } catch (error) {

@@ -3,8 +3,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MapBox, { MapView, Camera, ShapeSource, LineLayer } from '@rnmapbox/maps';
+
+// Initialize MapBox
+MapBox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_KEY || '');
 
 export default function ThankYouScreen() {
   const insets = useSafeAreaInsets();
@@ -99,8 +102,8 @@ export default function ThankYouScreen() {
             pitchEnabled={false}
           >
             <Camera
-              centerCoordinate={[(startLng + endLng) / 2, (startLat + endLat) / 2]}
-              zoomLevel={14}
+              centerCoordinate={[startLng, startLat]}
+              zoomLevel={16}
               animationDuration={0}
             />
             <ShapeSource
