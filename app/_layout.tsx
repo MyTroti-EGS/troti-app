@@ -2,6 +2,8 @@ import { Slot } from 'expo-router';
 import AuthProvider from 'providers/AuthProvider';
 import GradientStatusBar from '~/components/GradientStatusBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ApolloProvider } from '@apollo/client';
+import { apolloClient } from 'lib/apollo';
 
 import * as Location from 'expo-location';
 import { useEffect } from 'react';
@@ -17,21 +19,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
-        <GradientStatusBar
-          colors={[
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.5)',
-            'rgba(0,0,0,0.3)',
-            'rgba(0,0,0,0.2)',
-            'transparent',
-          ]}
-          barStyle="light"
-        />
-        <Slot />
-      </SafeAreaProvider>
-    </AuthProvider>
+    <ApolloProvider client={apolloClient}>
+      <AuthProvider>
+        <SafeAreaProvider>
+          <GradientStatusBar
+            colors={[
+              'rgba(0,0,0,0.6)',
+              'rgba(0,0,0,0.5)',
+              'rgba(0,0,0,0.3)',
+              'rgba(0,0,0,0.2)',
+              'transparent',
+            ]}
+            barStyle="light"
+          />
+          <Slot />
+        </SafeAreaProvider>
+      </AuthProvider>
+    </ApolloProvider>
   );
 }
 

@@ -1,65 +1,57 @@
 import { useEffect, useState } from 'react';
 import { ShapeSource, SymbolLayer, Images } from '@rnmapbox/maps';
-import { featureCollection, point } from '@turf/helpers';
+import { featureCollection, point, Feature, Point, Properties } from '@turf/helpers';
+import { useQuery, useSubscription } from '@apollo/client';
+import { gql } from '@apollo/client';
+import { ChargingStation, ChargingStationUpdate } from 'types/graphql';
 
 // Import charging station icon
 // @ts-expect-error
 import chargingStationIcon from 'assets/charging-station.png';
 
-export default function ChargingStationsLayer() {
-  const [chargingStations, setChargingStations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchChargingStations = async () => {
-      try {
-        const response = await fetch('https://bckegs.mxv.pt/graphql/v1', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            query: `
-              query ChargingStations {
-                chargingStations {
-                  id
-                  metadata
-                  location {
-                    latitude
-                    longitude
-                  }
-                }
-              }
-            `,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (result.errors) {
-          throw new Error(result.errors[0].message);
-        }
-
-        setChargingStations(result.data.chargingStations);
-      } catch (err) {
-        console.error('Error fetching charging stations:', err);
-        setError(err);
-      } finally {
-        setLoading(false);
+const GET_CHARGING_STATIONS = gql`
+  query GetChargingStations {
+    chargingStations {
+      id
+      metadata
+      location {
+        latitude
+        longitude
       }
-    };
+    }
+  }
+`;
 
-    fetchChargingStations();
-  }, []);
+const CHARGING_STATION_UPDATED = gql`
+  subscription OnChargingStationUpdated {
+    chargingStationUpdated {
+      id
+      metadata
+      location {
+        latitude
+        longitude
+      }
+    }
+  }
+`;
+
+type ChargingStationProperties = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+export default function ChargingStationsLayer() {
+  const { loading, error, data } = useQuery(GET_CHARGING_STATIONS);
+  const { data: subscriptionData } = useSubscription(CHARGING_STATION_UPDATED);
 
   // If still loading or there's an error, don't render the layer yet
-  if (loading || error) {
+  if (loading || error || !data?.chargingStations) {
     return null;
   }
 
   // Parse metadata for each station to get name
-  const stationsWithParsedMetadata = chargingStations.map((station) => {
+  const stationsWithParsedMetadata = data.chargingStations.map((station: ChargingStation) => {
     let metadata = {};
     try {
       metadata = JSON.parse(station.metadata);
@@ -75,35 +67,36 @@ export default function ChargingStationsLayer() {
 
   // Create GeoJSON feature collection for the charging stations
   const stationsFeatures = featureCollection(
-    stationsWithParsedMetadata.map((station) =>
-      point([parseFloat(station.location.longitude), parseFloat(station.location.latitude)], {
+    stationsWithParsedMetadata.map((station: ChargingStation & { parsedMetadata: any }) =>
+      point([parseFloat(station.location.longitude.toString()), parseFloat(station.location.latitude.toString())], {
         id: station.id,
         name: station.parsedMetadata.name || 'Charging Station',
         type: 'charging-station',
-      })
+      } as ChargingStationProperties)
     )
   );
 
   return (
-    <ShapeSource id="charging-stations-source" shape={stationsFeatures}>
-      <SymbolLayer
-        id="charging-stations-layer"
-        style={{
-          iconImage: 'charging-station',
-          iconSize: 0.23,
-          iconAllowOverlap: true,
-          iconAnchor: 'center',
-          textField: ['get', 'name'],
-          textSize: 12,
-          textOffset: [0, -2],
-          textAnchor: 'top',
-          textColor: '#175D97',
-          textHaloColor: 'white',
-          textHaloWidth: 1,
-        }}
-      />
-
+    <>
       <Images images={{ 'charging-station': chargingStationIcon }} />
-    </ShapeSource>
+      <ShapeSource id="charging-stations-source" shape={stationsFeatures as any}>
+        <SymbolLayer
+          id="charging-stations-layer"
+          style={{
+            iconImage: 'charging-station',
+            iconSize: 0.23,
+            iconAllowOverlap: true,
+            iconAnchor: 'center',
+            textField: ['get', 'name'],
+            textSize: 12,
+            textOffset: [0, -2],
+            textAnchor: 'top',
+            textColor: '#175D97',
+            textHaloColor: 'white',
+            textHaloWidth: 1,
+          }}
+        />
+      </ShapeSource>
+    </>
   );
 }
