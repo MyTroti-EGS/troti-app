@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { startTrip, endTrip } from '../services/tripService';
 import { router } from 'expo-router';
 import { useAuthSession } from '../providers/AuthProvider';
+import { useTripState } from '../hooks/useTripState';
 
 interface RideDrawerProps {
   isVisible: boolean;
@@ -30,10 +31,14 @@ export default function RideDrawer({
 }: RideDrawerProps) {
   const insets = useSafeAreaInsets();
   const [timer, setTimer] = useState(0);
-  const [isRiding, setIsRiding] = useState(false);
   const [drawerHeight] = useState(new Animated.Value(300));
   const [opacity] = useState(new Animated.Value(0.5));
   const { token } = useAuthSession();
+  const { tripState, setTripState } = useTripState();
+
+  // If we have a persisted trip but no scooter prop, use the persisted scooter
+  const currentScooter = scooter || tripState.scooter;
+  const isRiding = tripState.isRiding;
 
   useEffect(() => {
     Animated.parallel([
@@ -52,13 +57,19 @@ export default function RideDrawer({
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isRiding) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev + 1);
-      }, 1000);
+    if (isRiding && tripState.startTime) {
+      const startTime = tripState.startTime.getTime();
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        setTimer(Math.floor((now - startTime) / 1000));
+      };
+      
+      // Update immediately and then every second
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
     }
     return () => clearInterval(interval);
-  }, [isRiding]);
+  }, [isRiding, tripState.startTime]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -68,12 +79,12 @@ export default function RideDrawer({
   };
 
   const handleStartRide = async () => {
-    if (!scooter || !token?.current) return;
+    if (!currentScooter || !token?.current) return;
 
     const authToken = token.current;
     if (!authToken) return;
 
-    if (scooter.battery && scooter.battery < 40) {
+    if (currentScooter.battery && currentScooter.battery < 40) {
       Alert.alert(
         'Low Battery Warning',
         'This scooter has low battery. Are you sure you want to start the ride?',
@@ -83,8 +94,12 @@ export default function RideDrawer({
             text: 'Start Ride', 
             onPress: async () => {
               try {
-                await startTrip(scooter.id, authToken);
-                setIsRiding(true);
+                await startTrip(currentScooter.id, authToken);
+                setTripState({
+                  isRiding: true,
+                  startTime: new Date(),
+                  scooter: currentScooter,
+                });
                 onStartRide();
               } catch (error) {
                 console.error('Start ride error:', error);
@@ -99,8 +114,12 @@ export default function RideDrawer({
       );
     } else {
       try {
-        await startTrip(scooter.id, authToken);
-        setIsRiding(true);
+        await startTrip(currentScooter.id, authToken);
+        setTripState({
+          isRiding: true,
+          startTime: new Date(),
+          scooter: currentScooter,
+        });
         onStartRide();
       } catch (error) {
         console.error('Start ride error:', error);
@@ -119,16 +138,19 @@ export default function RideDrawer({
 
     try {
       const response = await endTrip(authToken);
-      setIsRiding(false);
+      setTripState({
+        isRiding: false,
+        startTime: null,
+        scooter: null,
+      });
       setTimer(0);
       onStopRide();
       
-      // Navigate to thank you screen with trip details
       router.push({
         pathname: '/thank-you',
         params: {
           tripCost: response.tripCost.toString(),
-          paymentUrl: response.paymentUrl,
+          invoiceId: response.invoiceId,
         },
       });
     } catch (error) {
@@ -156,16 +178,16 @@ export default function RideDrawer({
     }
   };
 
-  const isStartButtonDisabled = !scooter || 
-    scooter.status === 'MAINTENANCE' || 
-    scooter.status === 'OCCUPIED' || 
+  const isStartButtonDisabled = !currentScooter || 
+    currentScooter.status === 'MAINTENANCE' || 
+    currentScooter.status === 'OCCUPIED' || 
     isRiding;
 
-  if (!scooter) return null;
+  if (!currentScooter && !isRiding) return null;
 
   return (
     <Modal
-      visible={isVisible}
+      visible={isVisible || isRiding}
       animationType="slide"
       transparent={true}
       onRequestClose={() => {
@@ -197,11 +219,11 @@ export default function RideDrawer({
                 <View style={styles.scooterInfo}>
                   <View style={styles.infoRow}>
                     <Ionicons name="barcode-outline" size={20} color="#666" />
-                    <Text style={styles.infoText}>Serial: {scooter.serial_number}</Text>
+                    <Text style={styles.infoText}>Serial: {currentScooter?.serial_number}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Ionicons name="battery-charging" size={20} color="#666" />
-                    <Text style={styles.infoText}>Battery: {scooter.battery}%</Text>
+                    <Text style={styles.infoText}>Battery: {currentScooter?.battery}%</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={handleHeaderButtonPress} style={styles.minimizeButton}>

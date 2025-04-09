@@ -6,14 +6,15 @@ export default function ThankYouScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     tripCost?: string;
-    paymentUrl?: string;
+    invoiceId?: string;
   }>();
 
   const tripCost = params.tripCost ? parseFloat(params.tripCost) : 0;
-  const paymentUrl = params.paymentUrl || '';
+  const invoiceId = params.invoiceId || '';
 
   const handlePayNow = () => {
-    if (paymentUrl) {
+    if (invoiceId) {
+      const paymentUrl = `https://egs-backend.mxv.pt/pay/${invoiceId}`;
       Linking.openURL(paymentUrl);
     }
   };
@@ -32,7 +33,7 @@ export default function ThankYouScreen() {
           <TouchableOpacity 
             style={[styles.button, styles.payButton]} 
             onPress={handlePayNow}
-            disabled={!paymentUrl}
+            disabled={!invoiceId}
           >
             <Text style={styles.buttonText}>Pay Now</Text>
           </TouchableOpacity>
